@@ -1,5 +1,5 @@
 //
-//  Word.swift
+//  WordResponse.swift
 //  SampleApp
 //
 //  Created by natehancock on 6/28/22.
@@ -9,30 +9,34 @@ import Foundation
 
 
 struct Word: Codable {
-    var text: String
-    var definitions: [String]
+    let meta: Meta
+    let definitions: [String]
+    let wordClass: String?
+    var text: String!
+    var synonym: Synonym?
+    var giphy: Giphy?
     
+    var synonyms: [String] {
+        synonym?.meta.syns.first ?? []
+    }
     
-//    static func parseData(_ data: Data) -> Word {
-//        var word: Word = Word()
-//
-//        do {
-//            let json = try JSONSerialization.jsonObject(with: data, options: []) as! [[String: Any]]
-//
-//            for dict in json {
-//                if let meta = dict["meta"] as? [String: Any] {
-//                    if let id: String = meta["id"] as? String{
-//                        word.text = id
-//                    }
-//                }
-//                if let definitions = dict["shortdef"] as? [String] {
-//                    word.definitions = definitions
-//                }
-//            }
-//
-//        } catch {
-//            print("PARSING ERROR: ", error.localizedDescription)
-//        }
-//        return word
-//    }
+    var images: [String] {
+        Array(giphy?.imageData.compactMap { $0.images.original.mp4 }.prefix(7) ?? [])
+    }
+    
+    enum CodingKeys: String, CodingKey {
+        case meta
+        case definitions = "shortdef"
+        case wordClass = "fl"
+    }
+}
+
+extension Word {
+    struct Meta: Codable {
+        let id: String
+        let uuid: String
+        let sort: String
+        let stems: [String]
+        let offensive: Bool
+    }
 }
