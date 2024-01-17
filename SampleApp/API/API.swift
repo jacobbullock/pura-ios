@@ -7,49 +7,48 @@
 
 import Foundation
 
-class API: NSObject {
+class API {
     static let shared = API()
     let session = URLSession.shared
+
+    func fetchWord(query: String) async throws -> Word? {
+        guard !query.isEmpty else { throw APIError.emptyQuery }
+        guard query.count > 2 else { throw APIError.tooShort(query) }
+        
+        let requestURL = URLBuilder(word: query.lowercased()).dictionaryRequestURL
+        let result: [Word] = try await makeRequest(urlString: requestURL)
     
-    static let baseUrl = "https://www.dictionaryapi.com/api/v3/references/collegiate/json/"
+        var word = result.first
+        word?.text = query
+        word?.synonym = try await fetchSynonym(query: query)
+        word?.giphy = try await fetchGiphy(query: query)
+
+        return word
+    }
+
+    private func fetchSynonym(query: String) async throws -> Synonym? {
+        let requestURL = URLBuilder(word: query.lowercased()).thesaurusRequestURL
+        let result: [Synonym] = try await makeRequest(urlString: requestURL)
+        
+        return result.first
+    }
     
-    func fetchWord(query: String, _ completion: @escaping (Result<Data, APIError>) -> Void) {
-        guard !query.isEmpty else {
-            completion(.failure(.emptyQuery))
-            return
-        }
+    private func fetchGiphy(query: String) async throws -> Giphy? {
+        let requestURL = URLBuilder(word: query.lowercased()).giphyRequestURL
+        let result: Giphy = try await makeRequest(urlString: requestURL)
         
-        guard query.count > 2 else {
-            completion(.failure(.tooShort(query)))
-            return
-        }
-        
-        
-        let requestURL = URLBuilder(baseURL: API.baseUrl, word: query.lowercased()).requestURL
-        
-        guard let url = URL(string: requestURL) else {
-            completion(.failure(.badURL))
-            return
-        }
+        return result
+    }
+    
+    private func makeRequest<T: Codable>(urlString: String) async throws -> T {
+        guard let url = URL(string: urlString) else { throw APIError.badURL }
         
         let request = URLRequest(url: url)
         
         print("Fetching from: ", request.url?.absoluteString ?? "")
-        session.dataTask(with: request) { data, response, error in
-            if let error = error {
-                completion(.failure(.custom(error.localizedDescription)))
-                return
-            }
-            
-            guard let data = data else {
-                completion(.failure(.noData))
-                return
-            }
-            completion(.success(data))
-            
-
-        }.resume()
         
+        let (data, _) = try await session.data(for: request)
+        
+        return try JSONDecoder().decode(T.self, from: data)
     }
-    
 }
